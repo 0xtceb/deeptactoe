@@ -15,10 +15,11 @@ export interface Memory {
     state: State,
     action: number,
     doneFlag: boolean,
-    reward: number,
+    currentPlayer: Player,
     won: Player | null,
     tie: boolean,
-    nextState: State
+    nextState: State,
+    reward: number
 }
 export type board = number[];
 
@@ -47,11 +48,10 @@ export class GameEngine {
     }
 
     makeMove(index: number): Memory {
-        const currentState = this.state(this.aiPlayer);
+        const currentState = this.state(this.currentPlayer);
         const oldBoard = this.board.slice();
         this.board[index] = this.currentPlayer;
-        const nextState = this.state(this.aiPlayer);
-        const blockedMove = this.blockedMove(oldBoard, this.board, this.currentPlayer);
+        const nextState = this.state(this.currentPlayer);
         let winner = null;
         let tie = false;
         let done = false;
@@ -62,26 +62,25 @@ export class GameEngine {
         }
 
 
-        if(blockedMove && this.currentPlayer === this.aiPlayer && !done) {
+        /*if(blockedMove && this.currentPlayer === this.aiPlayer && !done) {
             this.reward = this.reward + 0.2;
-        }
+        }*/
+        /*if(missedBlock && this.currentPlayer === this.aiPlayer && !done) {
+            this.reward = this.reward - 0.5;
+        }*/
 
+        /*if(blockedLittleMove && this.currentPlayer === this.aiPlayer && !done) {
+            this.reward = this.reward + 0.2;
+        }*/
 
-        if(winner === this.aiPlayer) {
-            this.reward += 2;
-        }
-
-        if(winner !== null && winner !== this.aiPlayer) {
-            this.reward = this.reward - 3;
-        }
-
+        
         if(this.tie() === true && winner === null) {
             tie = true;
         }
 
         this.currentPlayer = this.currentPlayer === Player.X ? Player.O : Player.X;
 
-        return {state: currentState, action: index, doneFlag: done, reward: this.reward, won: winner, tie: tie, nextState: nextState};
+        return {state: currentState, reward: 0, action: index,currentPlayer: this.currentPlayer, doneFlag: done, won: winner, tie: tie, nextState: nextState};
     }
 
     blockedMove(previousBoard: board, nextBoard: board, player: Player) {
@@ -110,6 +109,32 @@ export class GameEngine {
         return blocked;
     }
 
+    missedBlock(previousBoard: board, nextBoard: board, player: Player) {
+        let blocked = false;
+        this.winningMoves.forEach(w => {
+            let betterBlock = 0;
+            let canBlock = false;
+            for(let i=0; i<w.length; i++) {
+                if(previousBoard[w[i]] !== player && previousBoard[w[i]] !== Player.NAN) {
+                    betterBlock ++;
+                }
+                if(previousBoard[w[i]] === Player.NAN) {
+                    canBlock = true;
+                }
+            }
+
+            if(betterBlock === 2 && canBlock === true) {
+                for(let i=0; i<w.length; i++) {
+                    if(nextBoard[w[i]] === player) {
+                        blocked = true;
+                    }
+                }   
+            }
+        });
+
+        return !blocked;
+    }
+
     state(playerPov: Player): State {
         
         const aiBoard = this.board.map((value) => {
@@ -122,7 +147,14 @@ export class GameEngine {
 
         return {
             ai: aiBoard,
-            ennemy: ennemyBoard
+            ennemy: ennemyBoard,
+        }
+    }
+
+    reverseState(state: State): State {
+        return {
+            ai: state.ennemy,
+            ennemy: state.ai
         }
     }
 
@@ -146,13 +178,15 @@ export class GameEngine {
                 state[n].ennemy.slice(3, 6),
                 state[n].ennemy.slice(6, 9)
             ];
+
+        
         }
         const buffer = tf.buffer([numStates, 3, 3, 2]);
 
         for(let n=0; n < numStates; n++) {
             for(let row=0; row < 3; row ++) {
                 for(let col=0; col < 3; col ++) {
-                    buffer.set(aiGrid[n][row][col], n, row, col, 0);
+                    buffer.set(aiGrid[n][row][col], n, row , col, 0);
                     buffer.set(ennemyGrid[n][row][col], n, row, col, 1);
                 }
             }
